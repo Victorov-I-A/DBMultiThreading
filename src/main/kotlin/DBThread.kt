@@ -1,3 +1,4 @@
+import org.postgresql.util.PSQLException
 import java.io.File
 import java.util.concurrent.CountDownLatch
 
@@ -11,11 +12,25 @@ class DBThread(
     override fun run() {
         try {
             latch.countDown()
+            try {
+                latch.await()
+            } catch (e: InterruptedException) {
+                e.printStackTrace()
+            }
             val timeList = mutableListOf<String>()
 
             for (i in 0 until repeats) {
                 val startTime = System.nanoTime()
-                dbTools.execute(query.statement)
+                while (true) {
+                    try {
+                        dbTools.execute(query.statement)
+                        break
+                    } catch (e: PSQLException) {
+                        if (e.sqlState.equals("40001")) {
+                            continue
+                        } else throw e
+                    }
+                }
                 timeList.add((System.nanoTime() - startTime).toString())
             }
             writeFile(timeList)
